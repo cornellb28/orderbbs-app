@@ -1,0 +1,18 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/pickup-reminders/day-before",
+      "schedule": "0 20 * * *",
+      "headers": {
+        "authorization": "Bearer @cron_secret"
+      }
+    },
+    {
+      "path": "/api/cron/pickup-reminders/day-of",
+      "schedule": "0 13 * * *",
+      "headers": {
+        "authorization": "Bearer @cron_secret"
+      }
+    }
+  ]
+}
