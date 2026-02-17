@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Kind = "day-before" | "day-of";
+
+type Ctx = { params: Promise<{ kind: string }> };
 
 function chicagoYMD(d: Date): string {
   // YYYY-MM-DD in America/Chicago
@@ -11,6 +13,17 @@ function chicagoYMD(d: Date): string {
     month: "2-digit",
     day: "2-digit",
   }).format(d);
+}
+
+function chicagoTimeLabel(timeStr: string) {
+  // Converts "13:00:00" -> "1:00 PM" (CT)
+  const [hh = "00", mm = "00"] = String(timeStr).split(":");
+  const dt = new Date(`2000-01-01T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00`);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(dt);
 }
 
 async function sendSms(to: string, body: string) {
@@ -47,21 +60,28 @@ async function sendSms(to: string, body: string) {
   }
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: { kind: string } }
-) {
-  // Protect endpoint
+function isAuthorized(req: NextRequest) {
+  // ✅ Vercel cron sets this header automatically
+  if (req.headers.get("x-vercel-cron") === "1") return true;
+
+  // Optional manual testing path:
+  // Hit: /api/cron/pickup-reminders/day-before?secret=YOUR_SECRET
   const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization");
-  if (!secret) {
-    return NextResponse.json({ error: "Missing CRON_SECRET" }, { status: 500 });
-  }
-  if (auth !== `Bearer ${secret}`) {
+  if (!secret) return false;
+
+  const { searchParams } = new URL(req.url);
+  return searchParams.get("secret") === secret;
+}
+
+export async function GET(req: NextRequest, ctx: Ctx) {
+  // ✅ Protect endpoint
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const kind = params.kind as Kind;
+  const { kind: kindRaw } = await ctx.params;
+  const kind = kindRaw as Kind;
+
   if (kind !== "day-before" && kind !== "day-of") {
     return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
   }
@@ -79,9 +99,14 @@ export async function GET(
     .maybeSingle();
 
   if (eventErr) {
-    return NextResponse.json({ ok: false, error: eventErr.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: eventErr.message },
+      { status: 500 }
+    );
   }
-  if (!event) return NextResponse.json({ ok: true, sent: 0, note: "No active event" });
+  if (!event) {
+    return NextResponse.json({ ok: true, sent: 0, note: "No active event" });
+  }
 
   const now = new Date();
   const today = chicagoYMD(now);
@@ -113,18 +138,23 @@ export async function GET(
     .is(reminderColumn, null);
 
   if (ordersErr) {
-    return NextResponse.json({ ok: false, error: ordersErr.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: ordersErr.message },
+      { status: 500 }
+    );
   }
 
   let sent = 0;
+
+  const pickupTime = `${chicagoTimeLabel(event.pickup_start)}–${chicagoTimeLabel(event.pickup_end)}`;
 
   for (const o of orders ?? []) {
     const phone = o.phone as string;
 
     const msg =
       kind === "day-of"
-        ? `Today is pickup day! ${event.title} pickup is ${event.pickup_date} ${event.pickup_start}-${event.pickup_end} at ${event.location_name}. ${event.location_address}`
-        : `Reminder: pickup is tomorrow. ${event.title} pickup is ${event.pickup_date} ${event.pickup_start}-${event.pickup_end} at ${event.location_name}. ${event.location_address}`;
+        ? `Today is pickup day! ${event.title} pickup is today (${event.pickup_date}) ${pickupTime} at ${event.location_name}. ${event.location_address}`
+        : `Reminder: pickup is tomorrow. ${event.title} pickup is ${event.pickup_date} ${pickupTime} at ${event.location_name}. ${event.location_address}`;
 
     await sendSms(phone, msg);
 
