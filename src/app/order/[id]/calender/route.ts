@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type Ctx = { params: Promise<{ id: string }> };
 
 function toICSDateTimeLocal(pickup_date: string, pickup_time: string) {
   // pickup_date: YYYY-MM-DD
@@ -17,10 +19,9 @@ function escapeICS(text: string) {
     .replaceAll(";", "\\;");
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
+
   const url = new URL(req.url);
   const token = url.searchParams.get("t");
 
@@ -32,7 +33,8 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("orders")
-    .select(`
+    .select(
+      `
       id,
       public_token,
       events (
@@ -43,8 +45,9 @@ export async function GET(
         location_name,
         location_address
       )
-    `)
-    .eq("id", params.id)
+    `
+    )
+    .eq("id", id)
     .eq("public_token", token)
     .maybeSingle();
 
@@ -61,6 +64,9 @@ export async function GET(
   const location = `${evt.location_name} — ${evt.location_address}`;
   const description = `Order ${data.id} pickup for Bowl & Broth Society.`;
 
+  const dtstamp =
+    new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -69,7 +75,7 @@ export async function GET(
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${data.id}@bowlandbrothsociety`,
-    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `DTSTAMP:${dtstamp}`,
     `DTSTART;TZID=America/Chicago:${dtStart}`,
     `DTEND;TZID=America/Chicago:${dtEnd}`,
     `SUMMARY:${escapeICS(summary)}`,
