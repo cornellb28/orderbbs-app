@@ -166,7 +166,6 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
     sent += 1;
   }
-
   return NextResponse.json({ ok: true, kind, sent, targetPickupDate });
 }
 
