@@ -208,7 +208,6 @@ export default async function HomePage() {
 
       <div style={{ marginTop: "3rem", opacity: 0.7 }}>
         <p>Pickup only · No walk-ups guaranteed</p>
-        <button className="btn btn-primary">Bootstrap Works</button>
       </div>
     </main>
   );

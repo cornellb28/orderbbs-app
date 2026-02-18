@@ -3,6 +3,21 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+type DbEvent = {
+  title: string;
+  pickup_date: string;
+  pickup_start: string;
+  pickup_end: string;
+  location_name: string;
+  location_address: string;
+};
+
+type DbOrderRow = {
+  id: string;
+  public_token: string;
+  events: DbEvent | DbEvent[] | null;
+};
+
 function toICSDateTimeLocal(pickup_date: string, pickup_time: string) {
   // pickup_date: YYYY-MM-DD
   // pickup_time: HH:MM:SS or HH:MM
@@ -17,6 +32,11 @@ function escapeICS(text: string) {
     .replaceAll("\n", "\\n")
     .replaceAll(",", "\\,")
     .replaceAll(";", "\\;");
+}
+
+function getSingleEvent(events: DbOrderRow["events"]): DbEvent | null {
+  if (!events) return null;
+  return Array.isArray(events) ? events[0] ?? null : events;
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
@@ -49,13 +69,16 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     )
     .eq("id", id)
     .eq("public_token", token)
-    .maybeSingle();
+    .maybeSingle<DbOrderRow>();
 
   if (error || !data) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  const evt = data.events;
+  const evt = getSingleEvent(data.events);
+  if (!evt) {
+    return NextResponse.json({ error: "Event not found for order" }, { status: 404 });
+  }
 
   const dtStart = toICSDateTimeLocal(evt.pickup_date, evt.pickup_start);
   const dtEnd = toICSDateTimeLocal(evt.pickup_date, evt.pickup_end);
