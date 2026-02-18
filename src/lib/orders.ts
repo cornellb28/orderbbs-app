@@ -28,6 +28,34 @@ export type OrderSummary = {
   }>;
 };
 
+type DbEvent = OrderSummary["event"];
+
+type DbOrderItem = {
+  qty: number;
+  unit_price_cents: number;
+  line_total_cents: number;
+  products: { name: string } | null;
+};
+
+type DbOrderRow = {
+  id: string;
+  public_token: string;
+  status: string;
+  paid: boolean;
+  total_cents: number;
+  customer_name: string;
+  email: string;
+  phone: string | null;
+  created_at: string;
+  events: DbEvent | DbEvent[] | null;
+  order_items: DbOrderItem[] | null;
+};
+
+function getSingleEvent(events: DbOrderRow["events"]): DbEvent | null {
+  if (!events) return null;
+  return Array.isArray(events) ? events[0] ?? null : events;
+}
+
 export async function getOrderSummary(orderId: string): Promise<OrderSummary | null> {
   const supabase = createSupabaseServerClient();
 
@@ -59,9 +87,12 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | n
       )
     `)
     .eq("id", orderId)
-    .maybeSingle();
+    .maybeSingle<DbOrderRow>();
 
   if (error || !data) return null;
+
+  const event = getSingleEvent(data.events);
+  if (!event) return null;
 
   return {
     id: data.id,
@@ -73,8 +104,8 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | n
     email: data.email,
     phone: data.phone,
     created_at: data.created_at,
-    event: data.events,
-    items: (data.order_items ?? []).map((it: any) => ({
+    event,
+    items: (data.order_items ?? []).map((it) => ({
       qty: it.qty,
       unit_price_cents: it.unit_price_cents,
       line_total_cents: it.line_total_cents,
