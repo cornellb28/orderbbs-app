@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export const runtime = "nodejs";
 
 type CheckoutItem = { productId: string; quantity: number };
 type CheckoutBody = {
@@ -230,6 +232,7 @@ export async function POST(req: Request) {
     }
 
     // 7) Create Stripe Checkout Session using server-trusted prices
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],

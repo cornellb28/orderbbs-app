@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrderSummary } from "@/lib/orders";
 import { getResend, getFromEmail } from "@/lib/email";
 import { orderConfirmationHtml } from "@/lib/email-templates";
 import Stripe from "stripe";
+
+export const runtime = "nodejs";
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
   try {
     // MUST be raw text for signature verification
     const rawBody = await req.text();
+    const stripe = getStripe();
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: unknown) {
     console.error("Webhook signature verification failed:", getErrorMessage(err));
