@@ -28,7 +28,9 @@ export default function AdminLoginClient() {
     }
 
     // After sign-in, the server guard will allow /admin
-    window.location.href = "/admin";
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") || "/admin";
+    window.location.href = next;
   }
 
   return (
