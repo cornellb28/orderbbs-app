@@ -17,17 +17,32 @@ type Subscriber = {
   created_at: string;
 };
 
-async function getCustomers() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/admin/customers`, { cache: "no-store" });
-  if (!res.ok) return { customersFromOrders: [], subscribers: [] };
-  return res.json();
+type CustomersPayload = {
+  customersFromOrders: OrderCustomer[];
+  subscribers: Subscriber[];
+};
+
+function fmtChicago(iso: string) {
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago" });
+}
+
+async function getCustomers(): Promise<CustomersPayload> {
+  const res = await fetch("/api/admin/customers", { cache: "no-store" });
+
+  if (!res.ok) {
+    return { customersFromOrders: [], subscribers: [] };
+  }
+
+  const data = (await res.json()) as Partial<CustomersPayload>;
+
+  return {
+    customersFromOrders: (data.customersFromOrders ?? []) as OrderCustomer[],
+    subscribers: (data.subscribers ?? []) as Subscriber[],
+  };
 }
 
 export default async function AdminCustomersPage() {
-  const data = await getCustomers();
-
-  const customersFromOrders = (data.customersFromOrders ?? []) as OrderCustomer[];
-  const subscribers = (data.subscribers ?? []) as Subscriber[];
+  const { customersFromOrders, subscribers } = await getCustomers();
 
   return (
     <main style={{ maxWidth: 980, margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -47,19 +62,22 @@ export default async function AdminCustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {customersFromOrders.map((c, idx) => (
-                <tr key={idx} style={{ borderTop: "1px solid #eee" }}>
+              {customersFromOrders.map((c) => (
+                <tr key={c.email} style={{ borderTop: "1px solid #eee" }}>
                   <td style={{ padding: 10 }}>{c.customer_name}</td>
                   <td style={{ padding: 10 }}>{c.email}</td>
                   <td style={{ padding: 10 }}>{c.phone ?? "—"}</td>
                   <td style={{ padding: 10 }}>{c.sms_opt_in ? "Yes" : "No"}</td>
-                  <td style={{ padding: 10 }}>
-                    {new Date(c.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                  </td>
+                  <td style={{ padding: 10 }}>{fmtChicago(c.created_at)}</td>
                 </tr>
               ))}
+
               {customersFromOrders.length === 0 ? (
-                <tr><td style={{ padding: 12 }} colSpan={5}>No customers yet.</td></tr>
+                <tr>
+                  <td style={{ padding: 12 }} colSpan={5}>
+                    No customers yet.
+                  </td>
+                </tr>
               ) : null}
             </tbody>
           </table>
@@ -79,18 +97,21 @@ export default async function AdminCustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {subscribers.map((s, idx) => (
-                <tr key={idx} style={{ borderTop: "1px solid #eee" }}>
+              {subscribers.map((s) => (
+                <tr key={s.email} style={{ borderTop: "1px solid #eee" }}>
                   <td style={{ padding: 10 }}>{s.name ?? "—"}</td>
                   <td style={{ padding: 10 }}>{s.email}</td>
                   <td style={{ padding: 10 }}>{s.phone ?? "—"}</td>
-                  <td style={{ padding: 10 }}>
-                    {new Date(s.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                  </td>
+                  <td style={{ padding: 10 }}>{fmtChicago(s.created_at)}</td>
                 </tr>
               ))}
+
               {subscribers.length === 0 ? (
-                <tr><td style={{ padding: 12 }} colSpan={4}>No subscribers yet.</td></tr>
+                <tr>
+                  <td style={{ padding: 12 }} colSpan={4}>
+                    No subscribers yet.
+                  </td>
+                </tr>
               ) : null}
             </tbody>
           </table>
