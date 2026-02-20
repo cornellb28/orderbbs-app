@@ -1,25 +1,50 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin";
 
-export default async function AdminHome() {
-  const { user } = await requireAdmin();
-
+export default function AdminDashboardPage() {
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "3rem 1.5rem" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: 6 }}>Admin</h1>
-      <p style={{ opacity: 0.7, marginBottom: 18 }}>
-        Signed in as <strong>{user.email}</strong>
+    <main style={{ maxWidth: 980, margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <h1 style={{ marginTop: 0 }}>Admin Dashboard</h1>
+      <p style={{ opacity: 0.75 }}>
+        Manage drops, orders, and customer lists.
       </p>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/admin/events">Manage Events</Link>
-        <Link href="/admin/orders">View Orders</Link>
-        <Link href="/admin/customers">Customers</Link>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginTop: 18 }}>
+        <Card
+          title="Events"
+          desc="Create/edit drop dates, deadline, active toggle, menu."
+          href="/admin/events"
+        />
+        <Card
+          title="Orders"
+          desc="View paid orders, totals, and statuses by event."
+          href="/admin/orders"
+        />
+        <Card
+          title="Customers"
+          desc="See customers (from orders) and subscribers list."
+          href="/admin/customers"
+        />
       </div>
-
-      <p style={{ marginTop: 24, opacity: 0.7 }}>
-        (Next we’ll build these pages.)
-      </p>
     </main>
+  );
+}
+
+function Card({ title, desc, href }: { title: string; desc: string; href: string }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "block",
+        padding: 16,
+        border: "1px solid #eee",
+        borderRadius: 12,
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div style={{ fontWeight: 800, fontSize: 18 }}>{title}</div>
+      <div style={{ marginTop: 6, opacity: 0.75, lineHeight: 1.4 }}>{desc}</div>
+      <div style={{ marginTop: 10, fontWeight: 700 }}>Open →</div>
+    </Link>
   );
 }
