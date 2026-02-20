@@ -6,9 +6,10 @@ import { createClient } from "@supabase/supabase-js";
 /**
  * Cookie-based server client (uses ANON key)
  * - Supports Supabase Auth sessions in Next.js App Router
- * - Use this for admin pages + any request that should respect RLS
+ * - Use this for pages/routes that should read the logged-in user session
+ * - Respects RLS
  */
-export async function createSupabaseServerClient() {
+export function createSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -18,16 +19,17 @@ export async function createSupabaseServerClient() {
     );
   }
 
-  const cookieStore = await cookies();
-
   return createServerClient(url, anon, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
+      // ✅ make these async so TS works whether cookies() is sync or async in your types
+      async getAll() {
+        const store = await cookies();
+        return store.getAll();
       },
-      setAll(cookiesToSet) {
+      async setAll(cookiesToSet) {
+        const store = await cookies();
         cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options);
+          store.set(name, value, options);
         });
       },
     },
