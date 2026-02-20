@@ -23,7 +23,7 @@ function chicagoYMD(d: Date): string {
 }
 
 export async function getNextDropEvent(): Promise<NextDropEvent | null> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const todayChicago = chicagoYMD(new Date());
 

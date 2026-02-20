@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ received: true });
       }
 
-      const supabase = createSupabaseServerClient();
+      const supabase = await createSupabaseServerClient();
 
       const paymentIntentId =
         typeof session.payment_intent === "string" ? session.payment_intent : null;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+
 export const runtime = "nodejs";
 
 type CheckoutItem = { productId: string; quantity: number };
@@ -112,7 +113,7 @@ export async function POST(req: Request) {
       ([productId, quantity]) => ({ productId, quantity })
     );
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
 
     // 1) Validate event is active + not past deadline
     const { data: event, error: eventErr } = await supabase

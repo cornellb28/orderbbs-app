@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
 
     // Upsert by unique email (prevents duplicates)
     const { error } = await supabase

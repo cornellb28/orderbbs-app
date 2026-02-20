@@ -55,7 +55,7 @@ export default async function OrderPage({
         );
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
 
     const { data, error } = await supabase
         .from("orders")

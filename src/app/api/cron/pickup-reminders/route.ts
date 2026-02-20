@@ -33,7 +33,7 @@ async function sendSms(to: string, body: string) {
 }
 
 export async function GET(req: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
 

@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export type OrderSummary = {
   id: string;
@@ -56,12 +56,15 @@ function getSingleEvent(events: DbOrderRow["events"]): DbEvent | null {
   return Array.isArray(events) ? events[0] ?? null : events;
 }
 
-export async function getOrderSummary(orderId: string): Promise<OrderSummary | null> {
-  const supabase = createSupabaseServerClient();
+export async function getOrderSummary(
+  orderId: string
+): Promise<OrderSummary | null> {
+  const supabase = createSupabaseServiceClient();
 
   const { data, error } = await supabase
     .from("orders")
-    .select(`
+    .select(
+      `
       id,
       public_token,
       status,
@@ -85,7 +88,8 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | n
         line_total_cents,
         products ( name )
       )
-    `)
+    `
+    )
     .eq("id", orderId)
     .maybeSingle<DbOrderRow>();
 
@@ -113,5 +117,3 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | n
     })),
   };
 }
-
-

@@ -86,7 +86,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // Use active event for MVP
   const { data: event, error: eventErr } = await supabase

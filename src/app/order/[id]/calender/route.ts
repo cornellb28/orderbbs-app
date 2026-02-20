@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from("orders")
