@@ -1,4 +1,7 @@
+// src/app/admin/orders/page.tsx
 import Link from "next/link";
+import { requireAdminOr401 } from "@/lib/admin-guard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SearchParams = { event?: string };
 
@@ -34,6 +37,22 @@ type AdminOrdersResponse = {
     stripe_session_id: string | null;
     stripe_payment_intent_id: string | null;
   }>;
+};
+
+type DbOrderRow = {
+  id: string;
+  event_id: string;
+  status: string;
+  paid: boolean;
+  total_cents: number;
+  customer_name: string;
+  email: string;
+  phone: string | null;
+  sms_opt_in: boolean | null;
+  created_at: string;
+  public_token: string;
+  stripe_session_id: string | null;
+  stripe_payment_intent_id: string | null;
 };
 
 function money(cents: number) {
@@ -72,17 +91,78 @@ function fmtPickupTime(timeStr: string) {
   }).format(d);
 }
 
-async function fetchAdminOrders(eventId: string): Promise<AdminOrdersResponse> {
-  // relative fetch works on Vercel & local
-  const res = await fetch(`/api/admin/orders?event=${encodeURIComponent(eventId)}`, {
-    cache: "no-store",
-  });
-
-  const data = (await res.json()) as { error?: string } & Partial<AdminOrdersResponse>;
-  if (!res.ok || !data.event || !data.orders || !data.totals) {
-    throw new Error(data.error || "Failed to load admin orders");
+async function loadAdminOrders(eventId: string): Promise<AdminOrdersResponse> {
+  // Server-side guard (cookie-based)
+  const admin = await requireAdminOr401();
+  if (!admin.ok) {
+    // Your middleware likely already blocks /admin, but keep a clean error:
+    throw new Error("Unauthorized");
   }
-  return data as AdminOrdersResponse;
+
+  const supabase = await createSupabaseServerClient();
+
+  // 1) Event metadata for header
+  const { data: event, error: eventErr } = await supabase
+    .from("events")
+    .select("id,title,pickup_date,pickup_start,pickup_end,location_name,deadline,is_active")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventErr) throw new Error(eventErr.message);
+  if (!event) throw new Error("Event not found");
+
+  // 2) Orders for this event
+  const { data: orders, error: ordersErr } = await supabase
+    .from("orders")
+    .select(
+      "id,event_id,status,paid,total_cents,customer_name,email,phone,sms_opt_in,created_at,public_token,stripe_session_id,stripe_payment_intent_id"
+    )
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false })
+    .returns<DbOrderRow[]>();
+
+  if (ordersErr) throw new Error(ordersErr.message);
+
+  const safeOrders =
+    (orders ?? []).map((o) => ({
+      id: o.id,
+      status: o.status,
+      paid: o.paid,
+      total_cents: o.total_cents,
+      customer_name: o.customer_name,
+      email: o.email,
+      phone: o.phone,
+      sms_opt_in: o.sms_opt_in ?? false,
+      created_at: o.created_at,
+      public_token: o.public_token,
+      stripe_session_id: o.stripe_session_id,
+      stripe_payment_intent_id: o.stripe_payment_intent_id,
+    })) ?? [];
+
+  // 3) Totals (fast + simple; can be moved to SQL later if needed)
+  const totals = safeOrders.reduce(
+    (acc, o) => {
+      acc.count_total += 1;
+      acc.revenue_total_cents += o.total_cents ?? 0;
+
+      if (o.paid) {
+        acc.count_paid += 1;
+        acc.revenue_paid_cents += o.total_cents ?? 0;
+      } else {
+        acc.count_unpaid += 1;
+      }
+      return acc;
+    },
+    {
+      count_total: 0,
+      count_paid: 0,
+      count_unpaid: 0,
+      revenue_total_cents: 0,
+      revenue_paid_cents: 0,
+    }
+  );
+
+  return { event, totals, orders: safeOrders };
 }
 
 export default async function AdminOrdersPage({
@@ -107,7 +187,7 @@ export default async function AdminOrdersPage({
 
   let payload: AdminOrdersResponse;
   try {
-    payload = await fetchAdminOrders(eventId);
+    payload = await loadAdminOrders(eventId);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return (

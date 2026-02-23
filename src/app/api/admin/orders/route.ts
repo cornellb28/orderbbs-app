@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireAdminOr401 } from "@/lib/admin-auth";
+import { requireAdminOr401 } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 

@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireAdminOr401 } from "@/lib/admin-guard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminOr401();
-  if (!admin.ok) return admin.res;
-
-  const { id } = await ctx.params;
-  const supabase = createSupabaseServiceClient();
-
-  // 1) deactivate all
+  // Deactivate all, then activate target.
+  // If you added the unique partial index, this is safe + enforced.
   const { error: offErr } = await supabase.from("events").update({ is_active: false }).eq("is_active", true);
-  if (offErr) return NextResponse.json({ error: offErr.message }, { status: 500 });
+  if (offErr) return NextResponse.json({ error: offErr.message }, { status: 400 });
 
-  // 2) activate selected event
-  const { error: onErr } = await supabase.from("events").update({ is_active: true }).eq("id", id);
-  if (onErr) return NextResponse.json({ error: onErr.message }, { status: 500 });
+  const { error: onErr } = await supabase.from("events").update({ is_active: true }).eq("id", params.id);
+  if (onErr) return NextResponse.json({ error: onErr.message }, { status: 400 });
+
+  // If this was a form submit, redirect back
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("text/html")) {
+    return NextResponse.redirect(new URL("/admin/events", req.url), 303);
+  }
 
   return NextResponse.json({ ok: true });
 }

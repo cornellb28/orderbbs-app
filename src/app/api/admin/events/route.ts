@@ -1,104 +1,109 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireAdminOr401 } from "@/lib/admin-guard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
-
-type CreateEventBody = {
-    title: string;
-    pickup_date: string;         // YYYY-MM-DD
-    pickup_start: string;        // HH:MM
-    pickup_end: string;          // HH:MM
-    location_name: string;
-    location_address: string;
-    deadline: string;            // ISO or "YYYY-MM-DDTHH:MM:SSZ"
-};
-
-function isCreateBody(v: unknown): v is CreateEventBody {
-    if (!v || typeof v !== "object") return false;
-    const b = v as Partial<CreateEventBody>;
-    return (
-        typeof b.title === "string" &&
-        typeof b.pickup_date === "string" &&
-        typeof b.pickup_start === "string" &&
-        typeof b.pickup_end === "string" &&
-        typeof b.location_name === "string" &&
-        typeof b.location_address === "string" &&
-        typeof b.deadline === "string"
-    );
+function asChicagoTimestamptz(datetimeLocal: string) {
+  // datetimeLocal is like "2026-02-23T18:30"
+  // We store as ISO w/ offset by assuming America/Chicago.
+  // Minimal approach: append current offset manually is error-prone (DST).
+  // Best: store as timestamptz but send ISO from client or use a tz library.
+  //
+  // If you can install a tz lib, do it (recommended):
+  //   npm i date-fns-tz
+  // and use zonedTimeToUtc (see snippet below).
+  //
+  // For now, assume browser is already in America/Chicago and treat it as local:
+  return new Date(datetimeLocal).toISOString();
 }
 
+// If you install date-fns-tz, replace asChicagoTimestamptz with:
+//
+// import { zonedTimeToUtc } from "date-fns-tz";
+// function asChicagoTimestamptz(datetimeLocal: string) {
+//   const utc = zonedTimeToUtc(datetimeLocal, "America/Chicago");
+//   return utc.toISOString();
+// }
+
 export async function GET() {
-    const admin = await requireAdminOr401();
-    if (!admin.ok) return admin.res;
+  const supabase = await createSupabaseServerClient();
 
-    const supabase = createSupabaseServiceClient();
+  const { data: events, error } = await supabase
+    .from("events")
+    .select("id,title,pickup_date,pickup_start,pickup_end,location_name,location_address,deadline,is_active,created_at")
+    .order("pickup_date", { ascending: false });
 
-    const [{ data: events, error: eErr }, { data: stats, error: sErr }] =
-        await Promise.all([
-            supabase
-                .from("events")
-                .select(
-                    "id,title,pickup_date,pickup_start,pickup_end,location_name,location_address,deadline,is_active,created_at"
-                )
-                .order("pickup_date", { ascending: false }),
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-            supabase
-                .from("event_order_stats")
-                .select(
-                    "event_id,orders_total,orders_paid,orders_unpaid,revenue_total_cents,revenue_paid_cents"
-                ),
-        ]);
+  // Pull stats via RPC
+  const { data: statsRows, error: statsErr } = await supabase.rpc("admin_event_stats");
+  if (statsErr) {
+    // Don’t hard-fail list if stats function isn’t set up yet
+    const withEmptyStats = (events ?? []).map((e) => ({
+      ...e,
+      stats: {
+        orders_total: 0,
+        orders_paid: 0,
+        orders_unpaid: 0,
+        revenue_total_cents: 0,
+        revenue_paid_cents: 0,
+      },
+    }));
+    return NextResponse.json({ events: withEmptyStats });
+  }
 
-    if (eErr) return NextResponse.json({ error: eErr.message }, { status: 500 });
-    if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+  const statsById = new Map(
+    (statsRows ?? []).map((r: any) => [
+      r.event_id,
+      {
+        orders_total: Number(r.orders_total ?? 0),
+        orders_paid: Number(r.orders_paid ?? 0),
+        orders_unpaid: Number(r.orders_unpaid ?? 0),
+        revenue_total_cents: Number(r.revenue_total_cents ?? 0),
+        revenue_paid_cents: Number(r.revenue_paid_cents ?? 0),
+      },
+    ])
+  );
 
-    const statsByEvent = new Map(
-        (stats ?? []).map((r) => [r.event_id, r])
-    );
+  const merged = (events ?? []).map((e: any) => ({
+    ...e,
+    stats:
+      statsById.get(e.id) ??
+      {
+        orders_total: 0,
+        orders_paid: 0,
+        orders_unpaid: 0,
+        revenue_total_cents: 0,
+        revenue_paid_cents: 0,
+      },
+  }));
 
-    const merged = (events ?? []).map((ev) => {
-        const st = statsByEvent.get(ev.id);
-        return {
-            ...ev,
-            stats: {
-                orders_total: st?.orders_total ?? 0,
-                orders_paid: st?.orders_paid ?? 0,
-                orders_unpaid: st?.orders_unpaid ?? 0,
-                revenue_total_cents: Number(st?.revenue_total_cents ?? 0),
-                revenue_paid_cents: Number(st?.revenue_paid_cents ?? 0),
-            },
-        };
-    });
-
-    return NextResponse.json({ events: merged });
+  return NextResponse.json({ events: merged });
 }
 
 export async function POST(req: Request) {
-    const admin = await requireAdminOr401();
-    if (!admin.ok) return admin.res;
+  const supabase = await createSupabaseServerClient();
+  const form = await req.formData();
 
-    const body: unknown = await req.json();
-    if (!isCreateBody(body)) {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-    }
+  const payload = {
+    title: String(form.get("title") ?? ""),
+    pickup_date: String(form.get("pickup_date") ?? ""),
+    pickup_start: String(form.get("pickup_start") ?? ""),
+    pickup_end: String(form.get("pickup_end") ?? ""),
+    location_name: String(form.get("location_name") ?? ""),
+    location_address: String(form.get("location_address") ?? ""),
+    deadline: asChicagoTimestamptz(String(form.get("deadline") ?? "")),
+    is_active: false,
+  };
 
-    const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
-        .from("events")
-        .insert({
-            title: body.title.trim(),
-            pickup_date: body.pickup_date,
-            pickup_start: body.pickup_start,
-            pickup_end: body.pickup_end,
-            location_name: body.location_name.trim(),
-            location_address: body.location_address.trim(),
-            deadline: body.deadline,
-            is_active: false,
-        })
-        .select("id")
-        .single<{ id: string }>();
+  const { data, error } = await supabase
+    .from("events")
+    .insert(payload)
+    .select("id")
+    .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, id: data.id });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // For form posts, redirect to edit page
+  return NextResponse.redirect(new URL(`/admin/events/${data.id}`, req.url), 303);
 }

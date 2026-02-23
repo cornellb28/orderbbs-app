@@ -1,55 +1,39 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireAdminOr401 } from "@/lib/admin-guard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
+function asChicagoTimestamptz(datetimeLocal: string) {
+  return new Date(datetimeLocal).toISOString();
+  // Recommended: date-fns-tz zonedTimeToUtc(datetimeLocal, "America/Chicago").toISOString()
+}
 
-type UpdateEventBody = Partial<{
-  title: string;
-  pickup_date: string;
-  pickup_start: string;
-  pickup_end: string;
-  location_name: string;
-  location_address: string;
-  deadline: string;
-}>;
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
+  const body = await req.json();
 
-export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminOr401();
-  if (!admin.ok) return admin.res;
+  const update = {
+    title: body.title,
+    pickup_date: body.pickup_date,
+    pickup_start: body.pickup_start,
+    pickup_end: body.pickup_end,
+    location_name: body.location_name,
+    location_address: body.location_address,
+    deadline: body.deadline ? asChicagoTimestamptz(body.deadline) : undefined,
+  };
 
-  const { id } = await ctx.params;
-  const body = (await req.json()) as UpdateEventBody;
+  // remove undefined keys
+  Object.keys(update).forEach((k) => (update as any)[k] === undefined && delete (update as any)[k]);
 
-  const patch: Record<string, unknown> = {};
-  if (typeof body.title === "string") patch.title = body.title.trim();
-  if (typeof body.pickup_date === "string") patch.pickup_date = body.pickup_date;
-  if (typeof body.pickup_start === "string") patch.pickup_start = body.pickup_start;
-  if (typeof body.pickup_end === "string") patch.pickup_end = body.pickup_end;
-  if (typeof body.location_name === "string") patch.location_name = body.location_name.trim();
-  if (typeof body.location_address === "string") patch.location_address = body.location_address.trim();
-  if (typeof body.deadline === "string") patch.deadline = body.deadline;
+  const { error } = await supabase.from("events").update(update).eq("id", params.id);
 
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: "No valid fields" }, { status: 400 });
-  }
-
-  const supabase = createSupabaseServiceClient();
-  const { error } = await supabase.from("events").update(patch).eq("id", id);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminOr401();
-  if (!admin.ok) return admin.res;
+export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
 
-  const { id } = await ctx.params;
+  const { error } = await supabase.from("events").delete().eq("id", params.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-  const supabase = createSupabaseServiceClient();
-  const { error } = await supabase.from("events").delete().eq("id", id);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr) return NextResponse.json({ step: "auth.getUser", error: authErr.message }, { status: 500 });

@@ -22,7 +22,7 @@ export default function EventEditClient({ event }: { event: AdminEvent }) {
     pickup_end: event.pickup_end.slice(0, 5),
     location_name: event.location_name,
     location_address: event.location_address,
-    deadline: event.deadline,
+    deadline: toDatetimeLocal(event.deadline),
   });
 
   async function save() {
@@ -50,6 +50,13 @@ export default function EventEditClient({ event }: { event: AdminEvent }) {
     const data = await res.json();
     if (!res.ok) return alert(data.error || "Activate failed");
     window.location.href = "/admin/events";
+  }
+
+  function toDatetimeLocal(isoOrDate: string) {
+    // If stored as ISO, convert to "YYYY-MM-DDTHH:mm" for datetime-local
+    const d = new Date(isoOrDate);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   return (
