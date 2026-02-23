@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Protect all /admin routes except /admin/login
@@ -55,7 +55,6 @@ export async function middleware(req: NextRequest) {
     .maybeSingle();
 
   if (adminErr) {
-    // IMPORTANT: this is the difference between "not_admin" vs "RLS blocked"
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/admin/login";
     loginUrl.searchParams.set("next", pathname);
