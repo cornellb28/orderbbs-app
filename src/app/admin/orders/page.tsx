@@ -1,4 +1,5 @@
-// src/app/admin/orders/page.tsx
+
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireAdminOr401 } from "@/lib/admin-guard";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -165,25 +166,53 @@ async function loadAdminOrders(eventId: string): Promise<AdminOrdersResponse> {
   return { event, totals, orders: safeOrders };
 }
 
+async function getCurrentEventId(): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+
+  // Prefer the single "active" event
+  const { data, error } = await supabase
+    .from("events")
+    .select("id")
+    .eq("is_active", true)
+    // if you could ever have multiple actives, pick the one with the latest deadline
+    .order("deadline", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.id ?? null;
+}
+
+async function getActiveEventId(): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("events")
+    .select("id")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.id ?? null;
+}
+
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: SearchParams;
 }) {
   const sp = await searchParams;
   const eventId = sp.event;
 
   if (!eventId) {
-    return (
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
-        <h1 style={{ fontSize: "2rem", marginBottom: 8 }}>Orders</h1>
-        <p style={{ opacity: 0.8 }}>
-          Missing <code>?event=&lt;id&gt;</code>. Go to{" "}
-          <Link href="/admin/events">/admin/events</Link> and click “View Orders”.
-        </p>
-      </main>
-    );
+  const activeId = await getActiveEventId();
+
+  if (!activeId) {
+    redirect("/admin/events");
   }
+
+  redirect(`/admin/orders?event=${activeId}`);
+}
 
   let payload: AdminOrdersResponse;
   try {

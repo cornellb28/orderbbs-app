@@ -1,39 +1,89 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-function asChicagoTimestamptz(datetimeLocal: string) {
-  return new Date(datetimeLocal).toISOString();
-  // Recommended: date-fns-tz zonedTimeToUtc(datetimeLocal, "America/Chicago").toISOString()
+type EventUpdate = {
+  title?: string;
+  pickup_date?: string;
+  pickup_start?: string;
+  pickup_end?: string;
+  location_name?: string;
+  location_address?: string;
+  deadline?: string;
+};
+
+export const dynamic = "force-dynamic";
+
+function asChicagoTimestamptz(datetimeLocalOrIso: string): string | undefined {
+  const d = new Date(datetimeLocalOrIso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString();
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const supabase = await createSupabaseServerClient();
+function normalizeTime(t?: string) {
+  if (!t) return undefined;
+  const parts = t.split(":");
+  const hh = (parts[0] ?? "00").padStart(2, "0");
+  const mm = (parts[1] ?? "00").padStart(2, "0");
+  const ss = (parts[2] ?? "00").padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+
+  if (!id || id === "undefined") {
+    return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseAdminClient();
   const body = await req.json();
 
-  const update = {
+  const deadlineIso = body.deadline ? asChicagoTimestamptz(body.deadline) : undefined;
+  if (body.deadline && !deadlineIso) {
+    return NextResponse.json({ error: "Invalid deadline value" }, { status: 400 });
+  }
+
+  const update: EventUpdate = {
     title: body.title,
     pickup_date: body.pickup_date,
-    pickup_start: body.pickup_start,
-    pickup_end: body.pickup_end,
+    pickup_start: normalizeTime(body.pickup_start),
+    pickup_end: normalizeTime(body.pickup_end),
     location_name: body.location_name,
     location_address: body.location_address,
-    deadline: body.deadline ? asChicagoTimestamptz(body.deadline) : undefined,
+    deadline: deadlineIso,
   };
 
-  // remove undefined keys
-  Object.keys(update).forEach((k) => (update as any)[k] === undefined && delete (update as any)[k]);
+  (Object.keys(update) as (keyof EventUpdate)[]).forEach((k) => {
+    if (update[k] === undefined) delete update[k];
+  });
 
-  const { error } = await supabase.from("events").update(update).eq("id", params.id);
+  // ✅ Update AND return updated row. If RLS blocks update or select, this fails.
+  const { data: event, error } = await supabase
+    .from("events")
+    .update(update)
+    .eq("id", id)
+    .select("id,title,pickup_date,pickup_start,pickup_end,location_name,location_address,deadline,is_active,created_at")
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ ok: true, event });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  const supabase = await createSupabaseServerClient();
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
 
-  const { error } = await supabase.from("events").delete().eq("id", params.id);
+  if (!id || id === "undefined") {
+    return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseAdminClient();
+
+  const { error } = await supabase.from("events").delete().eq("id", id);
+
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
   return NextResponse.json({ ok: true });
 }

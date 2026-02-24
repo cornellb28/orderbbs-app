@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminOr401 } from "@/lib/admin-guard";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -35,7 +35,7 @@ export async function GET() {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
-  const supabase = createSupabaseServiceClient();
+  const supabase = await createSupabaseServerClient();
 
   // A) customers from orders (unique by email)
   const { data: orders, error: oErr } = await supabase
