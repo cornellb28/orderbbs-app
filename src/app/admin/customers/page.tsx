@@ -20,6 +20,8 @@ type UnifiedCustomer = {
   last_order_paid: boolean | null;
 };
 
+type SP = Record<string, string | string[] | undefined>;
+
 function fmtChicago(iso: string) {
   return new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago" });
 }
@@ -57,12 +59,14 @@ const hrefCustomer = (email: string) => `/admin/customers/${encodeURIComponent(e
 export default async function AdminCustomersPage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<SP>;
 }) {
-  const search = typeof searchParams?.search === "string" ? searchParams.search : "";
-  const ordered = searchParams?.ordered === "1";
-  const subscribed = searchParams?.subscribed === "1";
-  const vip = searchParams?.vip === "1";
+  const sp = (await searchParams) ?? {}; // ✅ unwrap
+
+  const search = typeof sp.search === "string" ? sp.search : "";
+  const ordered = sp.ordered === "1";
+  const subscribed = sp.subscribed === "1";
+  const vip = sp.vip === "1";
 
   const customers = await getCustomers({ search, ordered, subscribed, vip });
 
