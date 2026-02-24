@@ -75,7 +75,6 @@ export default async function HomePage() {
       <h1 style={{ fontSize: "3rem", marginBottom: "1rem" }}>
         Bowl & Broth Society
       </h1>
-      <p style={{ opacity: 0.6 }}>DEPLOY TEST: 2026-02-18</p>
       <p
         style={{
           fontSize: "1.1rem",
