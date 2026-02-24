@@ -39,17 +39,25 @@ async function getCustomers(params: {
   subscribed?: boolean;
   vip?: boolean;
 }): Promise<UnifiedCustomer[]> {
-  const baseUrl = await getBaseUrl();
-  const qs = new URLSearchParams();
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const baseUrl = `${proto}://${host}`;
 
+  const qs = new URLSearchParams();
   if (params.search?.trim()) qs.set("search", params.search.trim());
   if (params.ordered) qs.set("ordered", "1");
   if (params.subscribed) qs.set("subscribed", "1");
   if (params.vip) qs.set("vip", "1");
 
-  const res = await fetch(`${baseUrl}/api/admin/customers?${qs.toString()}`, { cache: "no-store" });
-  if (!res.ok) return [];
+  const cookie = h.get("cookie") ?? ""; // ✅ forward session cookies
 
+  const res = await fetch(`${baseUrl}/api/admin/customers?${qs.toString()}`, {
+    cache: "no-store",
+    headers: { cookie }, // ✅ this is the fix
+  });
+
+  if (!res.ok) return [];
   const data = (await res.json()) as { customers?: UnifiedCustomer[] };
   return data.customers ?? [];
 }
@@ -160,9 +168,9 @@ export default async function AdminCustomersPage({
                   <td style={{ padding: 10 }}>{c.phone ?? "—"}</td>
 
                   <td style={{ padding: 10 }}>
-                    <span style={{ marginRight: 8 }}>{c.ordered ? "Ordered" : ""}</span>
-                    <span style={{ marginRight: 8 }}>{c.subscribed ? "Subscribed" : ""}</span>
-                    <span>{c.vip ? "VIP" : ""}</span>
+                    {c.ordered && <span className="badge bg-danger">Ordered</span>}
+                    {c.subscribed && <span className="badge bg-danger">Subscribed</span>}
+                    {c.vip && <span className="badge bg-danger vip">VIP</span>}
                   </td>
 
                   <td style={{ padding: 10 }}>{c.last_seen ? fmtChicago(c.last_seen) : "—"}</td>

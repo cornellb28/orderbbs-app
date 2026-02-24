@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminOr401 } from "@/lib/admin-guard";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -39,7 +39,7 @@ export async function GET(_req: Request, ctx: { params: { email: string } }) {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const email = normEmail(ctx.params.email);
 
   if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
@@ -135,7 +135,7 @@ export async function PATCH(req: Request, ctx: { params: { email: string } }) {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const email = normEmail(ctx.params.email);
 
   if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
@@ -149,7 +149,13 @@ export async function PATCH(req: Request, ctx: { params: { email: string } }) {
   const notes = body.notes === null || typeof body.notes === "string" ? body.notes : undefined;
   const vip = typeof body.vip === "boolean" ? body.vip : undefined;
 
-  if (name === undefined || phone === undefined || sms_opt_in === undefined || notes === undefined) {
+  if (
+    name === undefined ||
+    phone === undefined ||
+    sms_opt_in === undefined ||
+    vip === undefined ||
+    notes === undefined
+  ) {
     return NextResponse.json({ error: "Bad payload" }, { status: 400 });
   }
 

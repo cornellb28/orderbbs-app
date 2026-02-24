@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminOr401 } from "@/lib/admin-guard";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
@@ -94,6 +94,10 @@ export async function GET(req: Request) {
     .select("email,name,phone,sms_opt_in,vip,updated_at")
     .order("updated_at", { ascending: false })
     .returns<ProfileRow[]>();
+
+  console.log("profiles err:", pErr);
+  console.log("profiles count:", profiles?.length);
+  console.log("profiles sample:", profiles?.[0]);
 
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
