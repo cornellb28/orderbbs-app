@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
 
   // Protect all /admin routes except /admin/login
   if (!pathname.startsWith("/admin")) return NextResponse.next();
@@ -39,7 +39,7 @@ export async function proxy(req: NextRequest) {
   if (authErr || !authData?.user) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/admin/login";
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set("next", pathname + search);
     loginUrl.searchParams.set("error", "not_logged_in");
     return NextResponse.redirect(loginUrl);
   }

@@ -37,14 +37,11 @@ export default function AdminLoginClient() {
     // After sign-in, middleware will check allowlist.
     // Refresh first so the session cookie is definitely visible to the app,
     // then navigate to next.
-    router.refresh();
     router.replace(next);
+    router.refresh();
   }
 
-  const params = new URLSearchParams(
-    typeof window !== "undefined" ? window.location.search : ""
-  );
-  const err = params.get("error");
+  const err = searchParams.get("error");
 
   const banner =
     err === "not_admin"

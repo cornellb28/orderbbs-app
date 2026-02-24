@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getActiveEventWithMenu } from "@/lib/events";
 import { getNextDropEvent } from "@/lib/events-next";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import NotifyForm from "./notify-form";
+import Footer from "./components/footer";
 
 function formatPickupDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -48,10 +50,27 @@ export default async function HomePage() {
   const active = await getActiveEventWithMenu();
   const nextDrop = active ? null : await getNextDropEvent();
 
+    const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let isAdmin = false;
+
+  if (user) {
+    const { data: adminRow } = await supabase
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    isAdmin = !!adminRow;
+  }
+
   const deadlineText = active?.deadline ? formatDeadline(active.deadline) : null;
   const deadlinePassed = active?.deadline ? isDeadlinePassed(active.deadline) : false;
 
   return (
+    <>
     <main className="container" style={{ maxWidth: 720, margin: "0 auto", padding: "4rem 1.5rem" }}>
       <h1 style={{ fontSize: "3rem", marginBottom: "1rem" }}>
         Bowl & Broth Society
@@ -210,5 +229,7 @@ export default async function HomePage() {
         <p>Pickup only · No walk-ups guaranteed</p>
       </div>
     </main>
+    <Footer isAdmin={isAdmin} />
+    </>
   );
 }

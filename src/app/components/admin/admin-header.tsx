@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const adminNav = [
   { href: "/admin", label: "Dashboard" },
@@ -13,6 +15,34 @@ const adminNav = [
 
 export default function AdminHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Initial session check
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session);
+    });
+
+    // Stay in sync (logout/login, other tabs)
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsLoggedIn(!!session);
+      }
+    );
+
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`);
+    router.refresh();
+  };
 
   return (
     <header
@@ -32,7 +62,7 @@ export default function AdminHeader() {
           gap: 24,
         }}
       >
-        {/* Brand */}
+        {/* Brand (always visible) */}
         <Link
           href="/admin"
           style={{
@@ -40,35 +70,61 @@ export default function AdminHeader() {
             textDecoration: "none",
             color: "#111",
             letterSpacing: -0.5,
+            whiteSpace: "nowrap",
           }}
         >
           Admin
         </Link>
 
-        {/* Nav */}
-        <nav style={{ display: "flex", gap: 18 }}>
-          {adminNav.map((item) => {
-            const active = pathname.startsWith(item.href);
+        {/* Nav + Actions (only when logged in) */}
+        {isLoggedIn ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            {/* Nav */}
+            <nav style={{ display: "flex", gap: 18 }}>
+              {adminNav.map((item) => {
+                const active =
+                  pathname === item.href ||
+                  pathname.startsWith(item.href + "/");
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  color: active ? "#fff" : "#111",
-                  background: active ? "#111" : "transparent",
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    style={{
+                      textDecoration: "none",
+                      fontWeight: 700,
+                      fontSize: 14,
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      color: active ? "#fff" : "#111",
+                      background: active ? "#111" : "transparent",
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              type="button"
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                background: "transparent",
+                border: "1px solid #eee",
+                padding: "6px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Log out
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );
