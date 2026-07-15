@@ -6,35 +6,18 @@ type FooterProps = {
 
 export default function Footer({ isAdmin = false }: FooterProps) {
     return (
-        <footer
-            style={{
-                marginTop: "5rem",
-                padding: "3rem 1.5rem 2rem",
-                borderTop: "1px solid #eee",
-                opacity: 0.85,
-            }}
-        >
+        <footer className="container">
             <div
                 style={{
                     maxWidth: 720,
                     margin: "0 auto",
                     display: "grid",
-                    gridTemplateColumns: "1fr",
-                    gap: "2rem",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "1rem",
                 }}
             >
-                {/* Brand */}
-                <div>
-                    <strong>Bowl & Broth Society</strong>
-                    <p style={{ marginTop: 6, fontSize: 14, lineHeight: 1.6 }}>
-                        Japanese comfort food made in small batches.
-                        <br />
-                        Weekly drops · Limited quantities · Pickup only.
-                    </p>
-                </div>
-
                 {/* Customer info */}
-                <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+                <div className="d-flex flex-row gap-3">
                     <div>
                         <Link href="/preorder">Pre-order</Link>
                     </div>
@@ -58,7 +41,7 @@ export default function Footer({ isAdmin = false }: FooterProps) {
                 </div>
 
                 {/* Meta */}
-                <div style={{ fontSize: 13, opacity: 0.7 }}>
+                <div className="text-end">
 
                     <div>© {new Date().getFullYear()} Bowl & Broth Society</div>
                 </div>

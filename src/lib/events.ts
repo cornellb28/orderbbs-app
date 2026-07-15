@@ -36,10 +36,11 @@ export async function getActiveEventWithMenu(): Promise<EventWithMenu | null> {
     return null;
   }
 
-  const menu = data.event_products
+  const menu = (data.event_products ?? [])
     .filter((ep) => ep.is_active)
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((ep) => ep.products);
+    .map((ep) => ep.products)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return { ...data, menu };
 }
