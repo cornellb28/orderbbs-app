@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdminOr401 } from "@/lib/admin-guard";
 
 type EventUpdate = {
   title?: string;
@@ -30,13 +31,16 @@ function normalizeTime(t?: string) {
 
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const admin = await requireAdminOr401();
+  if (!admin.ok) return admin.res;
+
   const { id } = await ctx.params;
 
   if (!id || id === "undefined") {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }
 
-  const supabase = await createSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
   const body = await req.json();
 
   const deadlineIso = body.deadline ? asChicagoTimestamptz(body.deadline) : undefined;
@@ -74,13 +78,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const admin = await requireAdminOr401();
+  if (!admin.ok) return admin.res;
+
   const { id } = await ctx.params;
 
   if (!id || id === "undefined") {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }
 
-  const supabase = await createSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
   const { error } = await supabase.from("events").delete().eq("id", id);
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdminOr401 } from "@/lib/admin-guard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -56,6 +58,9 @@ function noStoreJson(body: unknown, status = 200) {
 }
 
 export async function GET(_req: Request) {
+  const admin = await requireAdminOr401();
+  if (!admin.ok) return admin.res;
+
   const supabase = await createSupabaseServerClient();
 
   // 1) Fetch events (no .returns<T>() so it works across versions)
@@ -106,4 +111,60 @@ export async function GET(_req: Request) {
   }));
 
   return noStoreJson({ events: merged });
+}
+
+function normalizeTime(t: string): string {
+  const [hh = "00", mm = "00", ss = "00"] = t.split(":");
+  return `${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}`;
+}
+
+export async function POST(req: Request) {
+  const admin = await requireAdminOr401();
+  if (!admin.ok) return admin.res;
+
+  const form = await req.formData();
+
+  const title = String(form.get("title") ?? "").trim();
+  const pickup_date = String(form.get("pickup_date") ?? "").trim();
+  const pickup_start = String(form.get("pickup_start") ?? "").trim();
+  const pickup_end = String(form.get("pickup_end") ?? "").trim();
+  const location_name = String(form.get("location_name") ?? "").trim();
+  const location_address = String(form.get("location_address") ?? "").trim();
+  const deadlineRaw = String(form.get("deadline") ?? "").trim();
+
+  if (!title || !pickup_date || !pickup_start || !pickup_end || !location_name || !location_address || !deadlineRaw) {
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const deadline = new Date(deadlineRaw);
+  if (Number.isNaN(deadline.getTime())) {
+    return NextResponse.json({ error: "Invalid deadline value" }, { status: 400 });
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  const { data: event, error } = await supabase
+    .from("events")
+    .insert({
+      title,
+      pickup_date,
+      pickup_start: normalizeTime(pickup_start),
+      pickup_end: normalizeTime(pickup_end),
+      location_name,
+      location_address,
+      deadline: deadline.toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("text/html")) {
+    return NextResponse.redirect(new URL(`/admin/events/${event.id}`, req.url), 303);
+  }
+
+  return NextResponse.json({ ok: true, event });
 }

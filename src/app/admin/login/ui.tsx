@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function AdminLoginClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -34,11 +33,11 @@ export default function AdminLoginClient() {
       return;
     }
 
-    // After sign-in, middleware will check allowlist.
-    // Refresh first so the session cookie is definitely visible to the app,
-    // then navigate to next.
-    router.replace(next);
-    router.refresh();
+    // A client-side router.replace() can race ahead of the auth cookie
+    // becoming visible to the middleware, bouncing the first /admin hit back
+    // to login even though sign-in succeeded. A hard navigation guarantees
+    // the request middleware sees carries the freshly-set session cookie.
+    window.location.href = next;
   }
 
   const err = searchParams.get("error");
