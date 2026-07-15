@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -15,7 +15,6 @@ const adminNav = [
 
 export default function AdminHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -40,8 +39,10 @@ export default function AdminHeader() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`);
-    router.refresh();
+    // Hard navigation, same reasoning as the login flow: a client-side
+    // router.replace() can race ahead of the session cookie actually
+    // clearing server-side.
+    window.location.href = "/";
   };
 
   return (
