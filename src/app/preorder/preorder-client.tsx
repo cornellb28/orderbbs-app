@@ -2,8 +2,33 @@
 
 import { useMemo, useState } from "react";
 import type { EventWithMenu, Product } from "@/lib/types";
+import type { NextDropEvent } from "@/lib/events-next";
 
-type Props = { event: EventWithMenu };
+type Props = {
+  event: EventWithMenu;
+  isOpen?: boolean;
+  nextDrop?: NextDropEvent | null;
+};
+
+function formatPickupDate(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(d);
+}
+
+function formatPickupTime(timeStr: string) {
+  const [hh = "00", mm = "00"] = timeStr.split(":");
+  const d = new Date(`2000-01-01T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00`);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(d);
+}
 
 type CustomerForm = {
   name: string;
@@ -34,7 +59,7 @@ function isValidUSPhone(input: string) {
   return digits.length === 10 || (digits.length === 11 && digits.startsWith("1"));
 }
 
-export default function PreorderClient({ event }: Props) {
+export default function PreorderClient({ event, isOpen = true, nextDrop = null }: Props) {
   const [qtyById, setQtyById] = useState<Record<string, number>>({});
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [smsOptIn, setSmsOptIn] = useState(false);
@@ -112,6 +137,32 @@ export default function PreorderClient({ event }: Props) {
         {event.location_name}
       </p>
 
+      {!isOpen ? (
+        <div
+          style={{
+            padding: "1rem 1.25rem",
+            border: "1px solid #eee",
+            borderRadius: 10,
+            background: "#fafafa",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordering Closed</div>
+          <div style={{ opacity: 0.85, lineHeight: 1.6 }}>
+            {nextDrop
+              ? <>
+                  Ordering opens again for the next drop: {formatPickupDate(nextDrop.pickup_date)} ·{" "}
+                  {formatPickupTime(nextDrop.pickup_start)}–{formatPickupTime(nextDrop.pickup_end)} at{" "}
+                  {nextDrop.location_name}.
+                </>
+              : "Next drop date will be posted soon."}
+          </div>
+          <div style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
+            Browsing the menu from the most recent drop below.
+          </div>
+        </div>
+      ) : null}
+
       <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Menu</h2>
 
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
@@ -136,16 +187,20 @@ export default function PreorderClient({ event }: Props) {
                 <div style={{ marginTop: 4 }}>${(p.price_cents / 100).toFixed(2)}</div>
               </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button onClick={() => dec(p.id)}>-</button>
-                <span style={{ minWidth: 24, textAlign: "center" }}>{qty}</span>
-                <button onClick={() => inc(p.id)}>+</button>
-              </div>
+              {isOpen ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button onClick={() => dec(p.id)}>-</button>
+                  <span style={{ minWidth: 24, textAlign: "center" }}>{qty}</span>
+                  <button onClick={() => inc(p.id)}>+</button>
+                </div>
+              ) : null}
             </li>
           );
         })}
       </ul>
 
+      {isOpen ? (
+        <>
       <h2 style={{ marginTop: "2rem", marginBottom: "0.75rem" }}>Customer Info</h2>
 
       <div style={{ display: "grid", gap: "0.75rem" }}>
@@ -241,6 +296,8 @@ export default function PreorderClient({ event }: Props) {
       >
         Pre-Order & Pay
       </button>
+        </>
+      ) : null}
     </main>
   );
 }

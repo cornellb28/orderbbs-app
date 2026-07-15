@@ -1,12 +1,23 @@
-import { getActiveEventWithMenu } from "@/lib/events";
+import { getActiveEventWithMenu, getLastEventWithMenu } from "@/lib/events";
+import { getNextDropEvent } from "@/lib/events-next";
 import PreorderClient from "./preorder-client";
 
 export default async function PreorderPage() {
-  const event = await getActiveEventWithMenu();
+  const activeEvent = await getActiveEventWithMenu();
 
-  if (!event) {
-    return <p>Preorders are currently closed.</p>;
+  if (activeEvent) {
+    return <PreorderClient event={activeEvent} isOpen />;
   }
 
-  return <PreorderClient event={event} />;
+  // No active drop — show the last drop's menu read-only instead of a bare
+  // "closed" message, with a banner pointing to when ordering reopens.
+  const lastEvent = await getLastEventWithMenu();
+
+  if (!lastEvent) {
+    return <p>Preorders are currently closed. Check back soon!</p>;
+  }
+
+  const nextDrop = await getNextDropEvent();
+
+  return <PreorderClient event={lastEvent} isOpen={false} nextDrop={nextDrop} />;
 }
