@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getOrderSummary } from "@/lib/orders";
 import { getResend, getFromEmail } from "@/lib/email";
 import { orderConfirmationHtml } from "@/lib/email-templates";
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ received: true });
       }
 
-      const supabase = await createSupabaseServerClient();
+      const supabase = createSupabaseAdminClient();
 
       const paymentIntentId =
         typeof session.payment_intent === "string" ? session.payment_intent : null;

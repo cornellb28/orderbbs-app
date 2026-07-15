@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireAdminOr401 } from "@/lib/admin-guard";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SearchParams = { event?: string };
 
@@ -100,7 +100,7 @@ async function loadAdminOrders(eventId: string): Promise<AdminOrdersResponse> {
     throw new Error("Unauthorized");
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   // 1) Event metadata for header
   const { data: event, error: eventErr } = await supabase
@@ -167,7 +167,7 @@ async function loadAdminOrders(eventId: string): Promise<AdminOrdersResponse> {
 }
 
 async function getCurrentEventId(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   // Prefer the single "active" event
   const { data, error } = await supabase
@@ -184,7 +184,7 @@ async function getCurrentEventId(): Promise<string | null> {
 }
 
 async function getActiveEventId(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
     .from("events")

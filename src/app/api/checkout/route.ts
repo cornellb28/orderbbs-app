@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 
 export const runtime = "nodejs";
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
       ([productId, quantity]) => ({ productId, quantity })
     );
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
 
     // 1) Validate event is active + not past deadline
     const { data: event, error: eventErr } = await supabase

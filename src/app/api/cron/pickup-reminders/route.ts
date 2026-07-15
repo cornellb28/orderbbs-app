@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 async function sendSms(to: string, body: string) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
@@ -33,7 +33,7 @@ async function sendSms(to: string, body: string) {
 }
 
 export async function GET(req: Request) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
 

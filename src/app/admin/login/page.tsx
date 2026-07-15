@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import AdminLoginClient from "./ui";
 
 export default function AdminLoginPage() {
@@ -7,7 +8,9 @@ export default function AdminLoginPage() {
       <p style={{ opacity: 0.75, marginBottom: 18 }}>
         Sign in to manage events and orders.
       </p>
-      <AdminLoginClient />
+      <Suspense fallback={null}>
+        <AdminLoginClient />
+      </Suspense>
     </main>
   );
 }

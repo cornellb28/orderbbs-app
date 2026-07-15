@@ -1,4 +1,4 @@
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type OrderSummary = {
   id: string;
@@ -59,7 +59,7 @@ function getSingleEvent(events: DbOrderRow["events"]): DbEvent | null {
 export async function getOrderSummary(
   orderId: string
 ): Promise<OrderSummary | null> {
-  const supabase = createSupabaseServiceClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
     .from("orders")

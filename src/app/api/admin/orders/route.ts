@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdminOr401 } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing event query param" }, { status: 400 });
   }
 
-  const supabase = createSupabaseServiceClient();
+  const supabase = createSupabaseAdminClient();
 
   // Fetch event metadata (title + pickup info) so page can show header
   const { data: event, error: eventErr } = await supabase

@@ -1,4 +1,4 @@
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { getOrderSummary } from "@/lib/orders";
 
 type SearchParams = { session_id?: string };
@@ -20,7 +20,7 @@ export default async function SuccessPage({
     );
   }
 
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  const session = await getStripe().checkout.sessions.retrieve(sessionId);
   const orderId = session.metadata?.orderId;
 
   if (!orderId) {

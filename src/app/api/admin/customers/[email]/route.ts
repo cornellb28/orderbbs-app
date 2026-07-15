@@ -35,12 +35,13 @@ function normEmail(raw: string) {
   return decodeURIComponent(raw).toLowerCase().trim();
 }
 
-export async function GET(_req: Request, ctx: { params: { email: string } }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ email: string }> }) {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
   const supabase = createSupabaseAdminClient();
-  const email = normEmail(ctx.params.email);
+  const { email: rawEmail } = await ctx.params;
+  const email = normEmail(rawEmail);
 
   if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
 
@@ -131,12 +132,13 @@ export async function GET(_req: Request, ctx: { params: { email: string } }) {
   });
 }
 
-export async function PATCH(req: Request, ctx: { params: { email: string } }) {
+export async function PATCH(req: Request, ctx: { params: Promise<{ email: string }> }) {
   const admin = await requireAdminOr401();
   if (!admin.ok) return admin.res;
 
   const supabase = createSupabaseAdminClient();
-  const email = normEmail(ctx.params.email);
+  const { email: rawEmail } = await ctx.params;
+  const email = normEmail(rawEmail);
 
   if (!email) return NextResponse.json({ error: "Missing email" }, { status: 400 });
 
