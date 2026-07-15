@@ -3,6 +3,12 @@
 import { useMemo, useState } from "react";
 import type { EventWithMenu, Product } from "@/lib/types";
 import type { NextDropEvent } from "@/lib/events-next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 
 type Props = {
   event: EventWithMenu;
@@ -128,70 +134,54 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>{event.title}</h1>
+    <main className="max-w-[720px] mx-auto px-6 py-8">
+      <h1 className="text-3xl font-bold mb-2 tracking-tight">{event.title}</h1>
 
-      <p style={{ marginBottom: "1.5rem", opacity: 0.8 }}>
+      <p className="mb-6 text-muted-foreground">
         Pickup: {event.pickup_date} · {event.pickup_start}–{event.pickup_end}
         <br />
         {event.location_name}
       </p>
 
       {!isOpen ? (
-        <div
-          style={{
-            padding: "1rem 1.25rem",
-            border: "1px solid #eee",
-            borderRadius: 10,
-            background: "#fafafa",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordering Closed</div>
-          <div style={{ opacity: 0.85, lineHeight: 1.6 }}>
-            {nextDrop
-              ? <>
-                  Ordering opens again for the next drop: {formatPickupDate(nextDrop.pickup_date)} ·{" "}
-                  {formatPickupTime(nextDrop.pickup_start)}–{formatPickupTime(nextDrop.pickup_end)} at{" "}
-                  {nextDrop.location_name}.
-                </>
-              : "Next drop date will be posted soon."}
-          </div>
-          <div style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
+        <Alert className="mb-6">
+          <AlertTitle>Ordering Closed</AlertTitle>
+          <AlertDescription>
+            {nextDrop ? (
+              <>
+                Ordering opens again for the next drop: {formatPickupDate(nextDrop.pickup_date)} ·{" "}
+                {formatPickupTime(nextDrop.pickup_start)}–{formatPickupTime(nextDrop.pickup_end)} at{" "}
+                {nextDrop.location_name}.
+              </>
+            ) : (
+              "Next drop date will be posted soon."
+            )}
+            <br />
             Browsing the menu from the most recent drop below.
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Menu</h2>
+      <h2 className="text-xl font-semibold mb-3">Menu</h2>
 
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <ul className="list-none p-0 m-0">
         {event.menu.map((p: Product) => {
           const qty = qtyById[p.id] ?? 0;
           return (
-            <li
-              key={p.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "0.75rem 0",
-                borderBottom: "1px solid #eee",
-              }}
-            >
+            <li key={p.id} className="flex justify-between items-center py-3 border-b">
               <div>
-                <div style={{ fontWeight: 600 }}>{p.name}</div>
+                <div className="font-semibold">{p.name}</div>
                 {p.description ? (
-                  <div style={{ fontSize: "0.9rem", opacity: 0.75 }}>{p.description}</div>
+                  <div className="text-sm text-muted-foreground">{p.description}</div>
                 ) : null}
-                <div style={{ marginTop: 4 }}>${(p.price_cents / 100).toFixed(2)}</div>
+                <div className="mt-1">${(p.price_cents / 100).toFixed(2)}</div>
               </div>
 
               {isOpen ? (
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button onClick={() => dec(p.id)}>-</button>
-                  <span style={{ minWidth: 24, textAlign: "center" }}>{qty}</span>
-                  <button onClick={() => inc(p.id)}>+</button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon-sm" onClick={() => dec(p.id)}>-</Button>
+                  <span className="min-w-6 text-center">{qty}</span>
+                  <Button variant="outline" size="icon-sm" onClick={() => inc(p.id)}>+</Button>
                 </div>
               ) : null}
             </li>
@@ -201,101 +191,103 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
 
       {isOpen ? (
         <>
-      <h2 style={{ marginTop: "2rem", marginBottom: "0.75rem" }}>Customer Info</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-3">Customer Info</h2>
 
-      <div style={{ display: "grid", gap: "0.75rem" }}>
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={customer.name}
-          onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
-          required
-        />
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="customer-name">Full Name</Label>
+              <Input
+                id="customer-name"
+                type="text"
+                placeholder="Full Name"
+                value={customer.name}
+                onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
+                required
+              />
+            </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={customer.email}
-          onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
-          required
-        />
+            <div className="grid gap-1.5">
+              <Label htmlFor="customer-email">Email</Label>
+              <Input
+                id="customer-email"
+                type="email"
+                placeholder="Email"
+                value={customer.email}
+                onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
+                required
+              />
+            </div>
 
-        <input
-          type="tel"
-          placeholder="Phone (optional)"
-          value={formatUSPhoneForDisplay(customer.phone)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            const digitsOnly = raw.replace(/\D/g, "").slice(0, 11);
+            <div className="grid gap-1.5">
+              <Label htmlFor="customer-phone">Phone (optional)</Label>
+              <Input
+                id="customer-phone"
+                type="tel"
+                placeholder="Phone (optional)"
+                value={formatUSPhoneForDisplay(customer.phone)}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const digitsOnly = raw.replace(/\D/g, "").slice(0, 11);
 
-            setCustomer((c) => ({ ...c, phone: digitsOnly }));
+                  setCustomer((c) => ({ ...c, phone: digitsOnly }));
 
-            if (!digitsOnly.trim()) {
-              setSmsOptIn(false);
-              setPhoneError(null);
-              return;
-            }
+                  if (!digitsOnly.trim()) {
+                    setSmsOptIn(false);
+                    setPhoneError(null);
+                    return;
+                  }
 
-            if (smsOptIn && !isValidUSPhone(digitsOnly)) {
-              setPhoneError("Enter a valid US phone number (10 digits).");
-            } else {
-              setPhoneError(null);
-            }
-          }}
-        />
+                  if (smsOptIn && !isValidUSPhone(digitsOnly)) {
+                    setPhoneError("Enter a valid US phone number (10 digits).");
+                  } else {
+                    setPhoneError(null);
+                  }
+                }}
+              />
+            </div>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, opacity: 0.9 }}>
-            <input
-              type="checkbox"
-              checked={smsOptIn}
-              disabled={!customer.phone.trim() || !isValidUSPhone(customer.phone)}
-              onChange={(e) => {
-                const next = e.target.checked;
+            <Label className="flex items-start gap-2.5 text-sm font-normal">
+              <Checkbox
+                checked={smsOptIn}
+                disabled={!customer.phone.trim() || !isValidUSPhone(customer.phone)}
+                onCheckedChange={(checked) => {
+                  const next = checked === true;
 
-                if (next && !isValidUSPhone(customer.phone)) {
-                  setPhoneError("Enter a valid US phone number (10 digits) to get SMS reminders.");
-                  return;
-                }
+                  if (next && !isValidUSPhone(customer.phone)) {
+                    setPhoneError("Enter a valid US phone number (10 digits) to get SMS reminders.");
+                    return;
+                  }
 
-                setSmsOptIn(next);
-                setPhoneError(null);
-              }}
-              style={{ marginTop: 3 }}
-            />
-            <span>
-              Text me pickup reminders (day before + day of). Msg &amp; data rates may apply. Reply STOP to opt out.
-            </span>
+                  setSmsOptIn(next);
+                  setPhoneError(null);
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                Text me pickup reminders (day before + day of). Msg &amp; data rates may apply. Reply STOP to opt out.
+              </span>
+            </Label>
+
+            {phoneError ? (
+              <p className="text-sm text-destructive">{phoneError}</p>
+            ) : null}
           </div>
 
-          {phoneError ? (
-            <div style={{ fontSize: 13, color: "#b00020" }}>{phoneError}</div>
-          ) : null}
-        </label>
-      </div>
+          <Separator className="my-6" />
 
-      <div style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between" }}>
-        <strong>Total</strong>
-        <strong>${(totalCents / 100).toFixed(2)}</strong>
-      </div>
+          <div className="flex justify-between font-semibold text-lg">
+            <span>Total</span>
+            <span>${(totalCents / 100).toFixed(2)}</span>
+          </div>
 
-      <button
-        onClick={checkout}
-        disabled={!cartItems.length || !isCustomerValid}
-        style={{
-          marginTop: "1.5rem",
-          width: "100%",
-          padding: "0.9rem",
-          background: cartItems.length && isCustomerValid ? "black" : "#999",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          fontWeight: 700,
-          cursor: cartItems.length && isCustomerValid ? "pointer" : "not-allowed",
-        }}
-      >
-        Pre-Order & Pay
-      </button>
+          <Button
+            onClick={checkout}
+            disabled={!cartItems.length || !isCustomerValid}
+            size="lg"
+            className="w-full mt-4"
+          >
+            Pre-Order & Pay
+          </Button>
         </>
       ) : null}
     </main>

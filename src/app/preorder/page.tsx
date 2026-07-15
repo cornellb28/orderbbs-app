@@ -14,7 +14,11 @@ export default async function PreorderPage() {
   const lastEvent = await getLastEventWithMenu();
 
   if (!lastEvent) {
-    return <p>Preorders are currently closed. Check back soon!</p>;
+    return (
+      <main className="max-w-[720px] mx-auto px-6 py-8">
+        <p className="text-muted-foreground">Preorders are currently closed. Check back soon!</p>
+      </main>
+    );
   }
 
   const nextDrop = await getNextDropEvent();

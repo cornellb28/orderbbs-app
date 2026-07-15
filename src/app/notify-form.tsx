@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 export default function NotifyForm() {
   const [name, setName] = useState("");
@@ -15,7 +19,6 @@ export default function NotifyForm() {
 
   const canSubmit = email.includes("@") && status !== "loading";
   const normalizedPhone = phone.replace(/\D/g, "");
-
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,18 +58,15 @@ export default function NotifyForm() {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}
-    >
-      <input
+    <form onSubmit={submit} className="grid gap-3 mt-4">
+      <Input
         type="text"
         placeholder="Name (optional)"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
 
-      <input
+      <Input
         type="email"
         placeholder="Email (required)"
         value={email}
@@ -74,7 +74,7 @@ export default function NotifyForm() {
         required
       />
 
-      <input
+      <Input
         type="tel"
         placeholder="Phone (optional, US)"
         value={phone}
@@ -85,46 +85,25 @@ export default function NotifyForm() {
         }}
       />
 
-      <label
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "flex-start",
-          fontSize: 14,
-          opacity: phone ? 0.9 : 0.5,
-        }}
-      >
-        <input
-          type="checkbox"
+      <Label className={`flex items-start gap-2.5 text-sm font-normal ${phone ? "opacity-90" : "opacity-50"}`}>
+        <Checkbox
           checked={smsOptIn}
           disabled={!phone.trim()}
-          onChange={(e) => setSmsOptIn(e.target.checked)}
-          style={{ marginTop: 3 }}
+          onCheckedChange={(checked) => setSmsOptIn(checked === true)}
+          className="mt-0.5"
         />
         <span>
           Text me when preorders open. Msg &amp; data rates may apply. Reply STOP
           to opt out.
         </span>
-      </label>
+      </Label>
 
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        style={{
-          padding: "0.9rem 1.2rem",
-          background: canSubmit ? "black" : "#999",
-          color: "white",
-          border: "none",
-          borderRadius: 10,
-          fontWeight: 700,
-          cursor: canSubmit ? "pointer" : "not-allowed",
-        }}
-      >
+      <Button type="submit" disabled={!canSubmit} size="lg">
         {status === "loading" ? "Joining..." : "Notify me for the next drop"}
-      </button>
+      </Button>
 
       {message ? (
-        <p style={{ margin: 0, opacity: status === "error" ? 1 : 0.8 }}>
+        <p className={`m-0 text-sm ${status === "error" ? "text-destructive" : "opacity-80"}`}>
           {message}
         </p>
       ) : null}

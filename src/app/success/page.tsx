@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/stripe";
 import { getOrderSummary } from "@/lib/orders";
+import { Separator } from "@/components/ui/separator";
 
 type SearchParams = { session_id?: string };
 
@@ -13,9 +14,9 @@ export default async function SuccessPage({
 
   if (!sessionId) {
     return (
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-        <h1>Payment Successful ✅</h1>
-        <p>Missing session_id.</p>
+      <main className="max-w-[720px] mx-auto px-6 py-8">
+        <h1 className="text-2xl font-bold mb-2">Payment Successful ✅</h1>
+        <p className="text-muted-foreground">Missing session_id.</p>
       </main>
     );
   }
@@ -25,9 +26,9 @@ export default async function SuccessPage({
 
   if (!orderId) {
     return (
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-        <h1>Payment Successful ✅</h1>
-        <p>We couldn’t find your order reference. Contact support.</p>
+      <main className="max-w-[720px] mx-auto px-6 py-8">
+        <h1 className="text-2xl font-bold mb-2">Payment Successful ✅</h1>
+        <p className="text-muted-foreground">We couldn’t find your order reference. Contact support.</p>
       </main>
     );
   }
@@ -36,24 +37,24 @@ export default async function SuccessPage({
 
   if (!order) {
     return (
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-        <h1>Payment Successful ✅</h1>
-        <p>Order not found yet. Please refresh in a moment.</p>
+      <main className="max-w-[720px] mx-auto px-6 py-8">
+        <h1 className="text-2xl font-bold mb-2">Payment Successful ✅</h1>
+        <p className="text-muted-foreground">Order not found yet. Please refresh in a moment.</p>
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <h1>Order Confirmed ✅</h1>
+    <main className="max-w-[720px] mx-auto px-6 py-8">
+      <h1 className="text-2xl font-bold mb-2">Order Confirmed ✅</h1>
 
-      <p style={{ opacity: 0.8 }}>
-        Order: <strong>{order.id}</strong>
+      <p className="text-muted-foreground">
+        Order: <strong className="text-foreground">{order.id}</strong>
         <br />
         {order.customer_name} · {order.email}
       </p>
 
-      <h2 style={{ marginTop: "1.5rem" }}>Pickup</h2>
+      <h2 className="text-lg font-semibold mt-6 mb-1">Pickup</h2>
       <p>
         <strong>{order.event.title}</strong>
         <br />
@@ -61,11 +62,11 @@ export default async function SuccessPage({
         <br />
         {order.event.location_name}
         <br />
-        <span style={{ opacity: 0.8 }}>{order.event.location_address}</span>
+        <span className="text-muted-foreground">{order.event.location_address}</span>
       </p>
 
-      <h2 style={{ marginTop: "1.5rem" }}>Items</h2>
-      <ul>
+      <h2 className="text-lg font-semibold mt-6 mb-1">Items</h2>
+      <ul className="list-disc pl-5">
         {order.items.map((it, idx) => (
           <li key={idx}>
             {it.qty}× {it.product.name} — ${(it.line_total_cents / 100).toFixed(2)}
@@ -73,7 +74,9 @@ export default async function SuccessPage({
         ))}
       </ul>
 
-      <p style={{ marginTop: "1rem", fontWeight: 700 }}>
+      <Separator className="my-4" />
+
+      <p className="font-bold text-lg">
         Total: ${(order.total_cents / 100).toFixed(2)}
       </p>
     </main>

@@ -1,4 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 type SearchParams = { t?: string };
 
@@ -48,9 +50,9 @@ export default async function OrderPage({
 
     if (!token) {
         return (
-            <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-                <h1>Order Receipt</h1>
-                <p>Missing access token.</p>
+            <main className="max-w-[720px] mx-auto px-6 py-8">
+                <h1 className="text-2xl font-bold mb-2">Order Receipt</h1>
+                <p className="text-muted-foreground">Missing access token.</p>
             </main>
         );
     }
@@ -89,9 +91,9 @@ export default async function OrderPage({
 
     if (error || !data) {
         return (
-            <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-                <h1>Order Receipt</h1>
-                <p>Order not found (or link is invalid).</p>
+            <main className="max-w-[720px] mx-auto px-6 py-8">
+                <h1 className="text-2xl font-bold mb-2">Order Receipt</h1>
+                <p className="text-muted-foreground">Order not found (or link is invalid).</p>
             </main>
         );
     }
@@ -99,9 +101,9 @@ export default async function OrderPage({
     const evt = getSingleEvent(data.events);
     if (!evt) {
         return (
-            <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-                <h1>Order Receipt</h1>
-                <p>Event not found for this order.</p>
+            <main className="max-w-[720px] mx-auto px-6 py-8">
+                <h1 className="text-2xl font-bold mb-2">Order Receipt</h1>
+                <p className="text-muted-foreground">Event not found for this order.</p>
             </main>
         );
     }
@@ -125,27 +127,26 @@ export default async function OrderPage({
     const googleDates = `${startYmd}T${startHm}00/${endYmd}T${endHm}00`;
 
     const googleUrl =
-    `https://calendar.google.com/calendar/render?action=TEMPLATE` +
-    `&text=${encodeURIComponent(`Pickup — ${evt.title}`)}` +
-    `&dates=${encodeURIComponent(googleDates)}` +
-    `&ctz=${encodeURIComponent("America/Chicago")}` +
-    `&location=${encodeURIComponent(`${evt.location_name} — ${evt.location_address}`)}` +
-    `&details=${encodeURIComponent(`Order ${data.id} pickup for Bowl & Broth Society.`)}`;
-
+        `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+        `&text=${encodeURIComponent(`Pickup — ${evt.title}`)}` +
+        `&dates=${encodeURIComponent(googleDates)}` +
+        `&ctz=${encodeURIComponent("America/Chicago")}` +
+        `&location=${encodeURIComponent(`${evt.location_name} — ${evt.location_address}`)}` +
+        `&details=${encodeURIComponent(`Order ${data.id} pickup for Bowl & Broth Society.`)}`;
 
     return (
-        <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-            <h1>Order Receipt ✅</h1>
+        <main className="max-w-[720px] mx-auto px-6 py-8">
+            <h1 className="text-2xl font-bold mb-2">Order Receipt ✅</h1>
 
-            <p style={{ opacity: 0.8 }}>
-                Order: <strong>{data.id}</strong>
+            <p className="text-muted-foreground">
+                Order: <strong className="text-foreground">{data.id}</strong>
                 <br />
                 {data.customer_name} · {data.email}
                 <br />
-                Status: <strong>{data.paid ? "Paid" : "Unpaid"}</strong> · {data.status}
+                Status: <strong className="text-foreground">{data.paid ? "Paid" : "Unpaid"}</strong> · {data.status}
             </p>
 
-            <h2 style={{ marginTop: "1.5rem" }}>Pickup</h2>
+            <h2 className="text-lg font-semibold mt-6 mb-1">Pickup</h2>
             <p>
                 <strong>{evt.title}</strong>
                 <br />
@@ -153,11 +154,11 @@ export default async function OrderPage({
                 <br />
                 {evt.location_name}
                 <br />
-                <span style={{ opacity: 0.8 }}>{evt.location_address}</span>
+                <span className="text-muted-foreground">{evt.location_address}</span>
             </p>
 
-            <h2 style={{ marginTop: "1.5rem" }}>Items</h2>
-            <ul>
+            <h2 className="text-lg font-semibold mt-6 mb-1">Items</h2>
+            <ul className="list-disc pl-5">
                 {items.map((it, idx) => (
                     <li key={idx}>
                         {it.qty}× {it.name} — ${(it.lineTotal / 100).toFixed(2)}
@@ -165,45 +166,21 @@ export default async function OrderPage({
                 ))}
             </ul>
 
-            <p style={{ marginTop: "1rem", fontWeight: 700 }}>
+            <Separator className="my-4" />
+
+            <p className="font-bold text-lg">
                 Total: ${(data.total_cents / 100).toFixed(2)}
             </p>
-            <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                <a
-                    href={icsUrl}
-                    style={{
-                        display: "inline-block",
-                        padding: "10px 14px",
-                        borderRadius: 10,
-                        border: "1px solid #ddd",
-                        textDecoration: "none",
-                        fontWeight: 700,
-                        color: "#111",
-                        background: "#fff",
-                    }}
-                >
+
+            <div className="flex gap-2.5 mt-3 flex-wrap">
+                <Button variant="outline" render={<a href={icsUrl} />}>
                     Add to Calendar (.ics)
-                </a>
+                </Button>
 
-                <a
-                    href={googleUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                        display: "inline-block",
-                        padding: "10px 14px",
-                        borderRadius: 10,
-                        border: "none",
-                        textDecoration: "none",
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: "#111",
-                    }}
-                >
+                <Button render={<a href={googleUrl} target="_blank" rel="noreferrer" />}>
                     Add to Google Calendar
-                </a>
+                </Button>
             </div>
-
         </main>
     );
 }

@@ -1,8 +1,8 @@
 export default function CanceledPage() {
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <h1>Checkout Canceled</h1>
-      <p>No worries — you can try again anytime.</p>
+    <main className="max-w-[720px] mx-auto px-6 py-8">
+      <h1 className="text-2xl font-bold mb-2">Checkout Canceled</h1>
+      <p className="text-muted-foreground">No worries — you can try again anytime.</p>
     </main>
   );
 }
