@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import OrderStatusPoller from "./status-poller";
 
 type SearchParams = { t?: string };
 
@@ -137,6 +138,10 @@ export default async function OrderPage({
     return (
         <main className="max-w-[720px] mx-auto px-6 py-8">
             <h1 className="text-2xl font-bold mb-2">Order Receipt ✅</h1>
+
+            {!data.paid ? (
+                <OrderStatusPoller orderId={data.id} token={token} initialPaid={data.paid} />
+            ) : null}
 
             <p className="text-muted-foreground">
                 Order: <strong className="text-foreground">{data.id}</strong>

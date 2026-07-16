@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-
 export const runtime = "nodejs";
 
 type CheckoutItem = { productId: string; quantity: number };
@@ -72,11 +71,6 @@ function isCheckoutBody(value: unknown): value is CheckoutBody {
 
 export async function POST(req: Request) {
   try {
-    const origin =
-      req.headers.get("origin") ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ??
-      new URL(req.url).origin;
-
     const body: unknown = await req.json();
     if (!isCheckoutBody(body)) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -84,7 +78,7 @@ export async function POST(req: Request) {
 
     const { eventId, customer, items } = body;
 
-    // ✅ Normalize phone + enforce rules for SMS opt-in
+    // Normalize phone + enforce rules for SMS opt-in
     const phoneRaw = (customer.phone ?? "").trim();
     const phoneNormalized = phoneRaw ? normalizePhoneToE164US(phoneRaw) : null;
 
@@ -95,7 +89,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // If they typed a phone but it’s invalid, reject (keeps DB clean)
     if (phoneRaw && !phoneNormalized) {
       return NextResponse.json(
         { error: "Phone number must be a valid US number (10 digits)." },
@@ -158,7 +151,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3) Fetch authoritative product details + prices
+    // 3) Fetch authoritative product details + prices (never trust client-supplied amounts)
     const { data: products, error: prodErr } = await supabase
       .from("products")
       .select("id, name, description, price_cents, is_active")
@@ -183,7 +176,6 @@ export async function POST(req: Request) {
 
       return {
         productId: p.id,
-        name: p.name,
         unit_amount: p.price_cents,
         quantity: i.quantity,
         line_total: p.price_cents * i.quantity,
@@ -202,14 +194,14 @@ export async function POST(req: Request) {
         event_id: eventId,
         customer_name: customer.name,
         email: customer.email,
-        phone: phoneNormalized, // ✅ store normalized E.164
+        phone: phoneNormalized,
         sms_opt_in: customer.smsOptIn === true,
         total_cents: totalCents,
         paid: false,
         status: "pending",
       })
-      .select("id")
-      .single<{ id: string }>();
+      .select("id, public_token")
+      .single<{ id: string; public_token: string }>();
 
     if (orderErr || !orderRow) {
       return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
@@ -232,54 +224,53 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to create order items" }, { status: 500 });
     }
 
-    // 7) Create Stripe Checkout Session using server-trusted prices
+    // 7) Create a PaymentIntent for the embedded Payment Element.
+    // automatic_payment_methods lets Stripe surface card, Apple Pay, Google Pay,
+    // and Cash App Pay automatically based on the buyer's device/browser
+    // eligibility and whatever's enabled in the Dashboard's payment methods
+    // settings — allow_redirects stays at its default ("always") since
+    // Cash App Pay is redirect-based.
     const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      billing_address_collection: "auto",
-      customer_email: customer.email,
-
-      line_items: lineItems.map((li) => ({
-        quantity: li.quantity,
-        price_data: {
-          currency: "usd",
-          unit_amount: li.unit_amount,
-          product_data: { name: li.name },
-        },
-      })),
-
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: totalCents,
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
       metadata: {
-        orderId,
+        supabase_order_id: orderId,
+        customer_email: customer.email,
+        customer_phone: phoneNormalized ?? "",
         eventId,
-        customerName: customer.name,
-        customerPhone: phoneNormalized ?? "", // ✅ normalized
-        smsOptIn: customer.smsOptIn === true ? "true" : "false",
       },
-
-      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/canceled`,
     });
 
-    if (!session.url) {
-      return NextResponse.json({ error: "Stripe session URL missing" }, { status: 500 });
-    }
-
-    // 8) Store stripe_session_id on the order
+    // 8) Store the PaymentIntent id on the order now (don't wait for the
+    // webhook — we already know it, and it lets us look the order back up
+    // from the client without depending on webhook timing).
     const { error: updErr } = await supabase
       .from("orders")
-      .update({ stripe_session_id: session.id })
+      .update({ stripe_payment_intent_id: paymentIntent.id })
       .eq("id", orderId);
 
     if (updErr) {
-      return NextResponse.json({ error: "Failed to link Stripe session" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to link payment intent" }, { status: 500 });
     }
 
-    return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err: unknown) {
-    console.error("Checkout error:", getErrorMessage(err));
+    if (!paymentIntent.client_secret) {
+      return NextResponse.json({ error: "PaymentIntent client secret missing" }, { status: 500 });
+    }
+
     return NextResponse.json(
-      { error: getErrorMessage(err) || "Checkout failed" },
+      {
+        clientSecret: paymentIntent.client_secret,
+        orderId,
+        publicToken: orderRow.public_token,
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    console.error("create-payment-intent error:", getErrorMessage(err));
+    return NextResponse.json(
+      { error: getErrorMessage(err) || "Failed to start payment" },
       { status: 500 }
     );
   }

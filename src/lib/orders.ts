@@ -8,6 +8,7 @@ export type OrderSummary = {
   customer_name: string;
   email: string;
   phone: string | null;
+  sms_opt_in: boolean;
   created_at: string;
   public_token: string;
 
@@ -46,6 +47,7 @@ type DbOrderRow = {
   customer_name: string;
   email: string;
   phone: string | null;
+  sms_opt_in: boolean | null;
   created_at: string;
   events: DbEvent | DbEvent[] | null;
   order_items: DbOrderItem[] | null;
@@ -73,6 +75,7 @@ export async function getOrderSummary(
       customer_name,
       email,
       phone,
+      sms_opt_in,
       created_at,
       events (
         title,
@@ -107,6 +110,7 @@ export async function getOrderSummary(
     public_token: data.public_token,
     email: data.email,
     phone: data.phone,
+    sms_opt_in: data.sms_opt_in === true,
     created_at: data.created_at,
     event,
     items: (data.order_items ?? []).map((it) => ({

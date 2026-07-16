@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import PaymentSection from "./payment-section";
 
 type Props = {
   event: EventWithMenu;
@@ -40,6 +41,12 @@ type CustomerForm = {
   name: string;
   email: string;
   phone: string; // store digits only (US) e.g. 2145551234 or 12145551234
+};
+
+type PaymentState = {
+  clientSecret: string;
+  orderId: string;
+  publicToken: string;
 };
 
 function formatUSPhoneForDisplay(input: string) {
@@ -74,6 +81,9 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
     email: "",
     phone: "",
   });
+  const [payment, setPayment] = useState<PaymentState | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   function inc(id: string) {
     setQtyById((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
@@ -102,7 +112,7 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
 
   const isCustomerValid = customer.name.trim().length > 0 && customer.email.includes("@");
 
-  async function checkout() {
+  async function startPayment() {
     if (!cartItems.length || !isCustomerValid) return;
 
     if (smsOptIn && !isValidUSPhone(customer.phone)) {
@@ -110,7 +120,10 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
       return;
     }
 
-    const res = await fetch("/api/checkout", {
+    setStarting(true);
+    setStartError(null);
+
+    const res = await fetch("/api/create-payment-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -123,15 +136,23 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
       }),
     });
 
-    const data: { url?: string; error?: string } = await res.json();
+    const data: { clientSecret?: string; orderId?: string; publicToken?: string; error?: string } =
+      await res.json();
 
-    if (!res.ok || !data.url) {
-      alert(data.error || "Checkout failed");
+    if (!res.ok || !data.clientSecret || !data.orderId || !data.publicToken) {
+      setStartError(data.error || "Could not start payment. Please try again.");
+      setStarting(false);
       return;
     }
 
-    window.location.href = data.url;
+    setPayment({ clientSecret: data.clientSecret, orderId: data.orderId, publicToken: data.publicToken });
+    setStarting(false);
   }
+
+  const cartLocked = !!payment;
+  const returnUrl = payment
+    ? `${window.location.origin}/order/${payment.orderId}?t=${encodeURIComponent(payment.publicToken)}`
+    : "";
 
   return (
     <main className="max-w-[720px] mx-auto px-6 py-8">
@@ -177,19 +198,21 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
                 <div className="mt-1">${(p.price_cents / 100).toFixed(2)}</div>
               </div>
 
-              {isOpen ? (
+              {isOpen && !cartLocked ? (
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="icon-sm" onClick={() => dec(p.id)}>-</Button>
                   <span className="min-w-6 text-center">{qty}</span>
                   <Button variant="outline" size="icon-sm" onClick={() => inc(p.id)}>+</Button>
                 </div>
+              ) : isOpen && qty > 0 ? (
+                <span className="text-sm text-muted-foreground">×{qty}</span>
               ) : null}
             </li>
           );
         })}
       </ul>
 
-      {isOpen ? (
+      {isOpen && !cartLocked ? (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-3">Customer Info</h2>
 
@@ -280,14 +303,31 @@ export default function PreorderClient({ event, isOpen = true, nextDrop = null }
             <span>${(totalCents / 100).toFixed(2)}</span>
           </div>
 
+          {startError ? (
+            <p className="text-sm text-destructive mt-3">{startError}</p>
+          ) : null}
+
           <Button
-            onClick={checkout}
-            disabled={!cartItems.length || !isCustomerValid}
+            onClick={startPayment}
+            disabled={!cartItems.length || !isCustomerValid || starting}
             size="lg"
             className="w-full mt-4"
           >
-            Pre-Order & Pay
+            {starting ? "Starting checkout…" : "Pre-Order & Pay"}
           </Button>
+        </>
+      ) : null}
+
+      {cartLocked && payment ? (
+        <>
+          <Separator className="my-6" />
+
+          <div className="flex justify-between font-semibold text-lg mb-4">
+            <span>Total</span>
+            <span>${(totalCents / 100).toFixed(2)}</span>
+          </div>
+
+          <PaymentSection clientSecret={payment.clientSecret} returnUrl={returnUrl} />
         </>
       ) : null}
     </main>

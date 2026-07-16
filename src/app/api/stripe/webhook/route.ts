@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getOrderSummary } from "@/lib/orders";
 import { getResend, getFromEmail } from "@/lib/email";
 import { orderConfirmationHtml } from "@/lib/email-templates";
+import { sendSms } from "@/lib/sms";
 import Stripe from "stripe";
 
 export const runtime = "nodejs";
@@ -11,6 +12,71 @@ export const runtime = "nodejs";
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+// Sends the order-confirmation email + (opt-in) SMS exactly once, guarded by
+// confirmation_email_sent_at. Called only after the order is confirmed paid.
+// Receipt failures are logged, never thrown — a broken email/SMS provider
+// must not cause Stripe to retry the webhook or otherwise affect payment
+// confirmation, which has already been recorded by this point.
+async function sendReceiptsOnce(orderId: string): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+
+  const { data: orderRow, error: orderFetchErr } = await supabase
+    .from("orders")
+    .select("id, confirmation_email_sent_at")
+    .eq("id", orderId)
+    .maybeSingle<{ id: string; confirmation_email_sent_at: string | null }>();
+
+  if (orderFetchErr || !orderRow) {
+    console.warn("Could not load order for receipt check", { orderId, err: orderFetchErr?.message });
+    return;
+  }
+
+  if (orderRow.confirmation_email_sent_at) {
+    console.log("ℹ️ Receipts already sent, skipping", { orderId });
+    return;
+  }
+
+  const order = await getOrderSummary(orderId);
+  if (!order) {
+    console.warn("Order summary not found for receipts", { orderId });
+    return;
+  }
+
+  try {
+    const resend = getResend();
+    const from = getFromEmail();
+
+    await resend.emails.send({
+      from,
+      to: order.email,
+      subject: "Your Bowl & Broth order is confirmed ✅",
+      html: orderConfirmationHtml(order),
+    });
+
+    console.log("✅ Confirmation email sent", { orderId, to: order.email });
+  } catch (e: unknown) {
+    console.error("Email receipt failed:", getErrorMessage(e), { orderId });
+  }
+
+  try {
+    if (order.phone && order.sms_opt_in) {
+      const total = (order.total_cents / 100).toFixed(2);
+      const msg = `Bowl & Broth Society: Your order is confirmed! Total $${total}. Pickup ${order.event.pickup_date} ${order.event.pickup_start}-${order.event.pickup_end} at ${order.event.location_name}. Thanks!`;
+      await sendSms(order.phone, msg);
+      console.log("✅ Confirmation SMS sent", { orderId, to: order.phone });
+    }
+  } catch (e: unknown) {
+    console.error("SMS receipt failed:", getErrorMessage(e), { orderId });
+  }
+
+  // Stamp once both receipt attempts are done (regardless of their individual
+  // success), so a retried webhook delivery doesn't resend either.
+  await supabase
+    .from("orders")
+    .update({ confirmation_email_sent_at: new Date().toISOString() })
+    .eq("id", orderId);
 }
 
 export async function POST(req: Request) {
@@ -37,98 +103,64 @@ export async function POST(req: Request) {
   }
 
   try {
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const orderId = paymentIntent.metadata?.supabase_order_id;
 
-      const orderId = session.metadata?.orderId;
       if (!orderId) {
-        console.error("Missing orderId in session metadata", {
-          sessionId: session.id,
-          metadata: session.metadata,
+        console.error("Missing supabase_order_id in PaymentIntent metadata", {
+          paymentIntentId: paymentIntent.id,
+          metadata: paymentIntent.metadata,
         });
         return NextResponse.json({ received: true });
       }
 
       const supabase = createSupabaseAdminClient();
 
-      const paymentIntentId =
-        typeof session.payment_intent === "string" ? session.payment_intent : null;
-
-      // 1) Mark order as paid/confirmed
+      // The webhook is the only source of truth for "paid" — this is what
+      // actually confirms the order, independent of whatever the client saw
+      // from stripe.confirmPayment().
       const { error: updErr } = await supabase
         .from("orders")
         .update({
           paid: true,
           status: "confirmed",
-          stripe_payment_intent_id: paymentIntentId,
+          stripe_payment_intent_id: paymentIntent.id,
         })
         .eq("id", orderId);
 
       if (updErr) {
         console.error("Failed to update order paid:", updErr.message, {
           orderId,
-          sessionId: session.id,
+          paymentIntentId: paymentIntent.id,
         });
-        // Still return 200 so Stripe doesn't retry forever; you can fix manually.
+        // Still return 200 so Stripe doesn't retry forever; fix manually.
         return NextResponse.json({ received: true });
       }
 
       console.log("✅ Order marked as paid", {
         orderId,
-        sessionId: session.id,
-        paymentIntentId,
-        email: session.customer_email,
+        paymentIntentId: paymentIntent.id,
       });
 
-      // 2) Idempotency: only send confirmation email once
-      const { data: orderRow, error: orderFetchErr } = await supabase
-        .from("orders")
-        .select("id, email, confirmation_email_sent_at")
-        .eq("id", orderId)
-        .maybeSingle<{ id: string; email: string; confirmation_email_sent_at: string | null }>();
+      await sendReceiptsOnce(orderId);
+    }
 
-      if (orderFetchErr || !orderRow) {
-        console.warn("Could not load order for email check", {
-          orderId,
-          err: orderFetchErr?.message,
-        });
-        return NextResponse.json({ received: true });
-      }
+    if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const orderId = paymentIntent.metadata?.supabase_order_id;
 
-      if (orderRow.confirmation_email_sent_at) {
-        console.log("ℹ️ Confirmation email already sent, skipping", { orderId });
-        return NextResponse.json({ received: true });
-      }
-
-      // 3) Send email + stamp confirmation_email_sent_at
-      try {
-        const order = await getOrderSummary(orderId);
-
-        if (!order) {
-          console.warn("Order summary not found for email", { orderId });
-          return NextResponse.json({ received: true });
-        }
-
-        const resend = getResend();
-        const from = getFromEmail();
-
-        await resend.emails.send({
-          from,
-          to: order.email,
-          subject: "Your Bowl & Broth order is confirmed ✅",
-          html: orderConfirmationHtml(order),
-        });
-
-        await supabase
-          .from("orders")
-          .update({ confirmation_email_sent_at: new Date().toISOString() })
-          .eq("id", orderId);
-
-        console.log("✅ Confirmation email sent", { orderId, to: order.email });
-      } catch (e: unknown) {
-        console.error("Email send failed:", getErrorMessage(e), { orderId });
-        // Don't throw — avoid Stripe retries spamming
-      }
+      // No status change here on purpose: the Payment Element lets the
+      // customer retry a failed attempt on the same PaymentIntent, so one
+      // failure doesn't mean the order is actually dead. This is logged for
+      // now per the task's admin "Failed Payment" notification requirement —
+      // wiring an actual admin alert (email/SMS) is a follow-up decision, not
+      // implemented here.
+      console.error("Payment failed", {
+        orderId,
+        paymentIntentId: paymentIntent.id,
+        error: paymentIntent.last_payment_error?.message,
+      });
     }
 
     return NextResponse.json({ received: true });
